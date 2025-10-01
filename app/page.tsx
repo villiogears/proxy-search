@@ -55,7 +55,7 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex items-center gap-2">
             <Image
-              src="/next.svg"
+              src="/proxy-search/next.svg"
               alt="Next.js"
               width={200}
               height={50}
