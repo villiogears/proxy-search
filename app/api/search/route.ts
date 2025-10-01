@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+// API Routeは動的にする必要がある
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
@@ -73,7 +77,7 @@ function parseSearchResultsDDG(html: string, query: string): SearchResult[] {
     console.log('Parsing DuckDuckGo results with Cheerio...');
     
     // DuckDuckGoの検索結果は .result クラスのdiv内にある
-    $('.result').each((i, element) => {
+    $('.result').each((_i: number, element: cheerio.Element) => {
       if (results.length >= 10) return false;
       
       const $result = $(element);
@@ -116,7 +120,7 @@ function parseSearchResultsDDG(html: string, query: string): SearchResult[] {
     if (results.length < 3) {
       console.log('Trying alternative DuckDuckGo selectors...');
       
-      $('.links_main a.result__url').each((i, element) => {
+      $('.links_main a.result__url').each((_i: number, element: cheerio.Element) => {
         if (results.length >= 10) return false;
         
         const $link = $(element);
@@ -167,170 +171,6 @@ function parseSearchResultsDDG(html: string, query: string): SearchResult[] {
   }
   
   return results.slice(0, 10);
-}
-
-function parseSearchResults(html: string, query: string): SearchResult[] {
-  const results: SearchResult[] = [];
-  
-  try {
-    const $ = cheerio.load(html);
-    
-    console.log('Parsing with Cheerio...');
-    
-    // Googleの検索結果の主要セレクター
-    // divの "g" クラス、または "Gx5Zad" クラスが検索結果のコンテナ
-    const searchSelectors = [
-      'div.g',
-      'div[data-sokoban-container]',
-      'div.Gx5Zad',
-      'div[jscontroller]',
-    ];
-    
-    for (const selector of searchSelectors) {
-      $(selector).each((i, element) => {
-        if (results.length >= 10) return false;
-        
-        const $element = $(element);
-        
-        // タイトルとリンクを探す
-        const $link = $element.find('a[href^="http"]').first();
-        const $title = $element.find('h3').first();
-        
-        // スニペットを探す
-        const $snippet = $element.find('div[data-sncf], div.VwiC3b, span.aCOpRe, div.s, div.st').first();
-        
-        if ($link.length && $title.length) {
-          const link = $link.attr('href') || '';
-          const title = $title.text().trim();
-          const snippet = $snippet.text().trim();
-          
-          // フィルタリング: Googleの内部リンクや重複を除外
-          if (link && 
-              link.startsWith('http') && 
-              !link.includes('google.com/search') &&
-              !link.includes('support.google.com') &&
-              !link.includes('accounts.google.com') &&
-              title.length > 0 &&
-              !results.some(r => r.link === link)) {
-            
-            results.push({
-              title,
-              link,
-              snippet: snippet.substring(0, 300),
-              displayLink: extractDomain(link),
-            });
-            
-            console.log(`Found result ${results.length}: ${title}`);
-          }
-        }
-      });
-      
-      if (results.length > 0) break; // 結果が見つかったら他のセレクターは試さない
-    }
-    
-    // 別のアプローチ: すべてのh3タグを探してその親要素を調べる
-    if (results.length < 3) {
-      console.log('Trying alternative approach...');
-      
-      $('h3').each((i, element) => {
-        if (results.length >= 10) return false;
-        
-        const $h3 = $(element);
-        const title = $h3.text().trim();
-        
-        if (!title) return;
-        
-        // h3の親要素からリンクを探す
-        const $parent = $h3.parent();
-        const link = $parent.attr('href') || $parent.find('a[href^="http"]').first().attr('href') || '';
-        
-        // h3の兄弟要素またはその周辺からスニペットを探す
-        let snippet = '';
-        const $container = $h3.closest('div');
-        const $snippetDiv = $container.find('div[data-sncf], div.VwiC3b, span.aCOpRe, div.s').first();
-        snippet = $snippetDiv.text().trim();
-        
-        if (link && 
-            link.startsWith('http') && 
-            !link.includes('google.com/search') &&
-            !results.some(r => r.link === link)) {
-          
-          results.push({
-            title,
-            link,
-            snippet: snippet.substring(0, 300),
-            displayLink: extractDomain(link),
-          });
-          
-          console.log(`Found result ${results.length} (alt): ${title}`);
-        }
-      });
-    }
-    
-    // より広範な検索: すべてのリンクを調べる
-    if (results.length < 3) {
-      console.log('Trying broad link search...');
-      
-      $('a[href^="http"]').each((i, element) => {
-        if (results.length >= 10) return false;
-        
-        const $link = $(element);
-        const link = $link.attr('href') || '';
-        
-        // フィルタリング
-        if (!link || 
-            link.includes('google.com') ||
-            link.includes('youtube.com/redirect') ||
-            link.includes('accounts.google') ||
-            results.some(r => r.link === link)) {
-          return;
-        }
-        
-        // タイトルを探す（リンク内またはその近くのh3）
-        let title = $link.find('h3').text().trim();
-        if (!title) {
-          title = $link.text().trim();
-        }
-        if (!title) {
-          const $h3 = $link.closest('div').find('h3').first();
-          title = $h3.text().trim();
-        }
-        
-        // スニペットを探す
-        const $container = $link.closest('div.g, div[jscontroller], div');
-        const snippet = $container.find('div[data-sncf], div.VwiC3b, span.aCOpRe').first().text().trim();
-        
-        if (title && title.length > 5) {
-          results.push({
-            title,
-            link,
-            snippet: snippet.substring(0, 300),
-            displayLink: extractDomain(link),
-          });
-          
-          console.log(`Found result ${results.length} (broad): ${title}`);
-        }
-      });
-    }
-    
-  } catch (error) {
-    console.error('Parse error:', error);
-  }
-  
-  // 重複を削除
-  const uniqueResults = results.filter((result, index, self) =>
-    index === self.findIndex((r) => r.link === result.link)
-  );
-  
-  console.log(`Total unique results: ${uniqueResults.length}`);
-  
-  // フォールバック: 検索クエリに関連するダミーデータ
-  if (uniqueResults.length === 0) {
-    console.log('No results found, using fallback data for query:', query);
-    return generateFallbackResults(query);
-  }
-  
-  return uniqueResults.slice(0, 10);
 }
 
 function generateFallbackResults(query: string): SearchResult[] {
