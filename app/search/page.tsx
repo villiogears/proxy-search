@@ -173,7 +173,7 @@ export default function SearchPage() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1 flex-shrink-0">
             <Image
-              src="/next.svg"
+              src="/proxy-search/next.svg"
               alt="Next.js"
               width={80}
               height={20}
