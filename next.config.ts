@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  // GitHub Pages用の静的エクスポートは無効化（API Routeを使用するため）
-  // output: 'export' を削除または設定しない
+  output: 'export', // GitHub Pages用の静的エクスポートを有効化
+  images: {
+    unoptimized: true, // 静的エクスポート時は画像最適化を無効化
+  },
 };
 
 export default nextConfig;
