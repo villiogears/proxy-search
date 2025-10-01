@@ -35,34 +35,58 @@ export default function SearchPage() {
     setLoading(true);
     setError(null);
     
-    try {
-      // クライアント側でCORSプロキシ経由でDuckDuckGoにアクセス
-      const proxyUrl = 'https://corsproxy.io/?';
-      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchTerm)}`;
-      
-      const response = await fetch(proxyUrl + encodeURIComponent(searchUrl), {
-        method: 'GET',
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch search results');
+    // 複数のCORSプロキシサービスを順番に試行
+    const proxyServices = [
+      { name: 'corsproxy.io', url: (target: string) => `https://corsproxy.io/?${encodeURIComponent(target)}` },
+      { name: 'allorigins', url: (target: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}` },
+      { name: 'thingproxy', url: (target: string) => `https://thingproxy.freeboard.io/fetch/${target}` },
+    ];
+    
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchTerm)}`;
+    
+    for (let i = 0; i < proxyServices.length; i++) {
+      const proxy = proxyServices[i];
+      try {
+        console.log(`Trying proxy service: ${proxy.name}`);
+        
+        const response = await fetch(proxy.url(searchUrl), {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+          signal: AbortSignal.timeout(10000), // 10秒タイムアウト
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        const parsedResults = parseSearchResults(html, searchTerm);
+        
+        if (parsedResults.length > 0) {
+          console.log(`Successfully fetched results using ${proxy.name}`);
+          setResults(parsedResults);
+          setLoading(false);
+          return;
+        }
+        
+        throw new Error('No results found in response');
+      } catch (err) {
+        console.error(`Proxy ${proxy.name} failed:`, err);
+        
+        // 最後のプロキシも失敗した場合
+        if (i === proxyServices.length - 1) {
+          setError('Unable to fetch search results. Showing fallback results.');
+          console.error('All proxy services failed, using fallback results');
+          setResults(generateFallbackResults(searchTerm));
+        }
+        // 次のプロキシを試行
+        continue;
       }
-      
-      const html = await response.text();
-      const parsedResults = parseSearchResults(html, searchTerm);
-      
-      setResults(parsedResults);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Search error:', err);
-      // フォールバック: ダミーデータを表示
-      setResults(generateFallbackResults(searchTerm));
-    } finally {
-      setLoading(false);
     }
+    
+    setLoading(false);
   }, []);
 
   const parseSearchResults = (html: string, searchTerm: string): SearchResult[] => {
@@ -161,7 +185,7 @@ export default function SearchPage() {
     if (searchQuery.trim()) {
       setQuery(searchQuery);
       fetchSearchResults(searchQuery);
-      window.history.pushState({}, '', `/search?q=${encodeURIComponent(searchQuery)}`);
+      window.history.pushState({}, '', `/proxy-search/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
