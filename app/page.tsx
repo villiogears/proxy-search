@@ -10,8 +10,7 @@ export default function Home() {
     e.preventDefault();
     if (searchQuery.trim()) {
       // Next.jsのルーティングを使用した検索結果ページへの遷移
-      console.log("Searching for:", searchQuery);
-      // 実際のアプリでは: router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+      window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`;
     }
   };
 
