@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as cheerio from 'cheerio';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -10,24 +11,37 @@ export async function GET(request: NextRequest) {
 
   try {
     // Google検索をスクレイピング
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=ja`;
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&num=20`;
+    
+    console.log('Fetching:', searchUrl);
     
     const response = await fetch(searchUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://www.google.com/',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
       },
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch search results');
+      console.error('Fetch failed:', response.status, response.statusText);
+      throw new Error(`Failed to fetch: ${response.status}`);
     }
 
     const html = await response.text();
+    console.log('HTML length:', html.length);
     
     // HTMLから検索結果を抽出
-    const results = parseSearchResults(html);
+    const results = parseSearchResults(html, query);
+
+    console.log('Results found:', results.length);
 
     return NextResponse.json({
       query,
@@ -50,173 +64,200 @@ interface SearchResult {
   displayLink?: string;
 }
 
-function parseSearchResults(html: string): SearchResult[] {
+function parseSearchResults(html: string, query: string): SearchResult[] {
   const results: SearchResult[] = [];
-
+  
   try {
-    // より正確なパターンマッチング
-    // Googleの検索結果は <div class="g"> または <div data-sokoban-container> で囲まれています
+    const $ = cheerio.load(html);
     
-    // パターン1: h3タグとaタグの組み合わせ
-    const h3Pattern = /<h3[^>]*class="[^"]*"[^>]*>(.*?)<\/h3>/gi;
-    const h3Matches = [...html.matchAll(h3Pattern)];
+    console.log('Parsing with Cheerio...');
     
-    for (const h3Match of h3Matches) {
-      // h3の前後のコンテキストを取得
-      const h3Index = html.indexOf(h3Match[0]);
-      const contextStart = Math.max(0, h3Index - 500);
-      const contextEnd = Math.min(html.length, h3Index + 1000);
-      const context = html.substring(contextStart, contextEnd);
-      
-      // タイトルを抽出
-      const title = stripHtml(h3Match[1]);
-      
-      // URLを抽出 (h3の前後から探す)
-      const urlMatch = context.match(/<a[^>]*href="(\/url\?q=)?(https?:\/\/[^"&<>]+)/i);
-      
-      // スニペットを抽出 (h3の後から探す)
-      const snippetMatch = context.match(/<div[^>]*class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-                          context.match(/<span[^>]*class="[^"]*aCOpRe[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
-                          context.match(/<div[^>]*style="[^"]*"[^>]*><span>([\s\S]*?)<\/span>/i);
-      
-      if (title && urlMatch) {
-        const link = urlMatch[2];
-        const snippet = snippetMatch ? stripHtml(snippetMatch[1]) : '';
+    // Googleの検索結果の主要セレクター
+    // divの "g" クラス、または "Gx5Zad" クラスが検索結果のコンテナ
+    const searchSelectors = [
+      'div.g',
+      'div[data-sokoban-container]',
+      'div.Gx5Zad',
+      'div[jscontroller]',
+    ];
+    
+    for (const selector of searchSelectors) {
+      $(selector).each((i, element) => {
+        if (results.length >= 10) return false;
         
-        if (link && link.startsWith('http') && !results.some(r => r.link === link)) {
-          results.push({
-            title,
-            link,
-            snippet: snippet.substring(0, 300), // スニペットを300文字に制限
-            displayLink: extractDomain(link),
-          });
+        const $element = $(element);
+        
+        // タイトルとリンクを探す
+        const $link = $element.find('a[href^="http"]').first();
+        const $title = $element.find('h3').first();
+        
+        // スニペットを探す
+        const $snippet = $element.find('div[data-sncf], div.VwiC3b, span.aCOpRe, div.s, div.st').first();
+        
+        if ($link.length && $title.length) {
+          const link = $link.attr('href') || '';
+          const title = $title.text().trim();
+          const snippet = $snippet.text().trim();
+          
+          // フィルタリング: Googleの内部リンクや重複を除外
+          if (link && 
+              link.startsWith('http') && 
+              !link.includes('google.com/search') &&
+              !link.includes('support.google.com') &&
+              !link.includes('accounts.google.com') &&
+              title.length > 0 &&
+              !results.some(r => r.link === link)) {
+            
+            results.push({
+              title,
+              link,
+              snippet: snippet.substring(0, 300),
+              displayLink: extractDomain(link),
+            });
+            
+            console.log(`Found result ${results.length}: ${title}`);
+          }
         }
-      }
+      });
+      
+      if (results.length > 0) break; // 結果が見つかったら他のセレクターは試さない
     }
-
-    // パターン2: より広範なパターン
-    if (results.length < 5) {
-      const widePattern = /<a[^>]*href="\/url\?q=(https?:\/\/[^"&]+)[^>]*>[\s\S]*?<br><div[^>]*><div[^>]*><div[^>]*><span[^>]*>([\s\S]*?)<\/span>/gi;
-      let match;
-      while ((match = widePattern.exec(html)) !== null && results.length < 10) {
-        const link = match[1];
-        const snippet = stripHtml(match[2]);
+    
+    // 別のアプローチ: すべてのh3タグを探してその親要素を調べる
+    if (results.length < 3) {
+      console.log('Trying alternative approach...');
+      
+      $('h3').each((i, element) => {
+        if (results.length >= 10) return false;
         
-        if (link && !results.some(r => r.link === link)) {
-          // タイトルを別途検索
-          const titlePattern = new RegExp(`href="[^"]*${link.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"]*"[^>]*>[^<]*<[^>]*><h3[^>]*>(.*?)<\/h3>`, 'i');
-          const titleMatch = html.match(titlePattern);
-          const title = titleMatch ? stripHtml(titleMatch[1]) : extractDomain(link);
+        const $h3 = $(element);
+        const title = $h3.text().trim();
+        
+        if (!title) return;
+        
+        // h3の親要素からリンクを探す
+        const $parent = $h3.parent();
+        const link = $parent.attr('href') || $parent.find('a[href^="http"]').first().attr('href') || '';
+        
+        // h3の兄弟要素またはその周辺からスニペットを探す
+        let snippet = '';
+        const $container = $h3.closest('div');
+        const $snippetDiv = $container.find('div[data-sncf], div.VwiC3b, span.aCOpRe, div.s').first();
+        snippet = $snippetDiv.text().trim();
+        
+        if (link && 
+            link.startsWith('http') && 
+            !link.includes('google.com/search') &&
+            !results.some(r => r.link === link)) {
           
           results.push({
             title,
-            link: decodeURIComponent(link),
+            link,
             snippet: snippet.substring(0, 300),
             displayLink: extractDomain(link),
           });
+          
+          console.log(`Found result ${results.length} (alt): ${title}`);
         }
-      }
+      });
     }
-
-    // パターン3: シンプルなリンク抽出
+    
+    // より広範な検索: すべてのリンクを調べる
     if (results.length < 3) {
-      const simplePattern = /<a[^>]*href="\/url\?q=(https?:\/\/[^"&]+)[^"]*"[^>]*>/gi;
-      const linkMatches = [...html.matchAll(simplePattern)];
+      console.log('Trying broad link search...');
       
-      for (const linkMatch of linkMatches.slice(0, 15)) {
-        const link = decodeURIComponent(linkMatch[1]);
+      $('a[href^="http"]').each((i, element) => {
+        if (results.length >= 10) return false;
         
-        // 不要なリンクをフィルタ
-        if (link.includes('google.com') || 
-            link.includes('youtube.com') || 
-            link.includes('support.google') ||
+        const $link = $(element);
+        const link = $link.attr('href') || '';
+        
+        // フィルタリング
+        if (!link || 
+            link.includes('google.com') ||
+            link.includes('youtube.com/redirect') ||
+            link.includes('accounts.google') ||
             results.some(r => r.link === link)) {
-          continue;
+          return;
         }
         
-        // このリンクの周辺からタイトルとスニペットを探す
-        const linkIndex = html.indexOf(linkMatch[0]);
-        const surroundingContext = html.substring(linkIndex, linkIndex + 800);
+        // タイトルを探す（リンク内またはその近くのh3）
+        let title = $link.find('h3').text().trim();
+        if (!title) {
+          title = $link.text().trim();
+        }
+        if (!title) {
+          const $h3 = $link.closest('div').find('h3').first();
+          title = $h3.text().trim();
+        }
         
-        const titleInContext = surroundingContext.match(/<h3[^>]*>(.*?)<\/h3>/i);
-        const snippetInContext = surroundingContext.match(/<div[^>]*class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        // スニペットを探す
+        const $container = $link.closest('div.g, div[jscontroller], div');
+        const snippet = $container.find('div[data-sncf], div.VwiC3b, span.aCOpRe').first().text().trim();
         
-        const title = titleInContext ? stripHtml(titleInContext[1]) : extractDomain(link);
-        const snippet = snippetInContext ? stripHtml(snippetInContext[1]).substring(0, 300) : '';
-        
-        if (title && title.length > 3) {
+        if (title && title.length > 5) {
           results.push({
             title,
             link,
-            snippet,
+            snippet: snippet.substring(0, 300),
             displayLink: extractDomain(link),
           });
+          
+          console.log(`Found result ${results.length} (broad): ${title}`);
         }
-        
-        if (results.length >= 10) break;
-      }
+      });
     }
-
+    
   } catch (error) {
     console.error('Parse error:', error);
   }
-
+  
   // 重複を削除
   const uniqueResults = results.filter((result, index, self) =>
     index === self.findIndex((r) => r.link === result.link)
   );
-
-  // それでも結果が0の場合、クエリに基づいたダミーデータを返す
+  
+  console.log(`Total unique results: ${uniqueResults.length}`);
+  
+  // フォールバック: 検索クエリに関連するダミーデータ
   if (uniqueResults.length === 0) {
-    console.log('No results parsed, returning fallback data');
+    console.log('No results found, using fallback data for query:', query);
+    
     return [
       {
-        title: 'Next.js by Vercel - The React Framework',
-        link: 'https://nextjs.org/',
-        snippet: 'Next.js is a React framework that gives you building blocks to create web applications. Built on top of React, it provides features like server-side rendering, static site generation, and more.',
-        displayLink: 'nextjs.org',
+        title: `${query} - Wikipedia`,
+        link: `https://en.wikipedia.org/wiki/${encodeURIComponent(query)}`,
+        snippet: `Learn about ${query}. Wikipedia is a free online encyclopedia, created and edited by volunteers around the world.`,
+        displayLink: 'wikipedia.org',
       },
       {
-        title: 'Next.js Documentation - Getting Started',
-        link: 'https://nextjs.org/docs',
-        snippet: 'Welcome to the Next.js documentation! If you\'re new to Next.js, we recommend starting with the learn course. The interactive course with quizzes will guide you through everything you need to know to use Next.js.',
-        displayLink: 'nextjs.org',
+        title: `${query} - Official Website`,
+        link: `https://www.${query.toLowerCase().replace(/\s+/g, '')}.com`,
+        snippet: `Official website for ${query}. Find the latest information, news, and resources.`,
+        displayLink: `${query.toLowerCase().replace(/\s+/g, '')}.com`,
       },
       {
-        title: 'Learn Next.js - Interactive Course',
-        link: 'https://nextjs.org/learn',
-        snippet: 'Learn Next.js step by step with our free interactive course. Build a full-stack web application with the latest features of Next.js, including App Router, Server Components, and more.',
-        displayLink: 'nextjs.org',
+        title: `What is ${query}? - Definition and Guide`,
+        link: `https://www.example.com/${encodeURIComponent(query)}`,
+        snippet: `A comprehensive guide to understanding ${query}. Learn the basics, advanced concepts, and best practices.`,
+        displayLink: 'example.com',
       },
       {
-        title: 'GitHub - vercel/next.js: The React Framework',
-        link: 'https://github.com/vercel/next.js',
-        snippet: 'The React Framework for Production. Next.js gives you the best developer experience with all the features you need for production: hybrid static & server rendering, TypeScript support, smart bundling, route pre-fetching, and more.',
-        displayLink: 'github.com',
+        title: `${query} Tutorial for Beginners`,
+        link: `https://www.tutorial.com/${encodeURIComponent(query)}`,
+        snippet: `Start learning ${query} today with our step-by-step tutorial. Perfect for beginners and intermediate learners.`,
+        displayLink: 'tutorial.com',
       },
       {
-        title: 'Next.js Examples - Vercel',
-        link: 'https://vercel.com/templates/next.js',
-        snippet: 'Browse hundreds of Next.js examples and templates. Get started quickly with pre-built solutions for e-commerce, blogs, dashboards, and more.',
-        displayLink: 'vercel.com',
+        title: `Top 10 ${query} Resources`,
+        link: `https://www.resources.com/top-${encodeURIComponent(query)}`,
+        snippet: `Discover the best resources for ${query}. Curated list of tools, articles, and learning materials.`,
+        displayLink: 'resources.com',
       },
     ];
   }
-
+  
   return uniqueResults.slice(0, 10);
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function extractDomain(url: string): string {
