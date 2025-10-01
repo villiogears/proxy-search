@@ -77,7 +77,7 @@ function parseSearchResultsDDG(html: string, query: string): SearchResult[] {
     console.log('Parsing DuckDuckGo results with Cheerio...');
     
     // DuckDuckGoの検索結果は .result クラスのdiv内にある
-    $('.result').each((_i: number, element: any) => {
+    $('.result').each((_i: number, element: cheerio.AnyNode) => {
       if (results.length >= 10) return false;
       
       const $result = $(element);
@@ -120,7 +120,7 @@ function parseSearchResultsDDG(html: string, query: string): SearchResult[] {
     if (results.length < 3) {
       console.log('Trying alternative DuckDuckGo selectors...');
       
-      $('.links_main a.result__url').each((_i: number, element: any) => {
+      $('.links_main a.result__url').each((_i: number, element: cheerio.AnyNode) => {
         if (results.length >= 10) return false;
         
         const $link = $(element);
