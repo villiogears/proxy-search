@@ -1,102 +1,198 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [searchQuery, setSearchQuery] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      // Next.jsのルーティングを使用した検索結果ページへの遷移
+      console.log("Searching for:", searchQuery);
+      // 実際のアプリでは: router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-4">
+          <a 
+            href="https://nextjs.org" 
+            target="_blank" 
             rel="noopener noreferrer"
+            className="text-sm text-gray-700 dark:text-gray-300 hover:underline"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
+            About
           </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
+          <a 
+            href="https://nextjs.org/docs" 
+            target="_blank" 
             rel="noopener noreferrer"
+            className="text-sm text-gray-700 dark:text-gray-300 hover:underline"
           >
-            Read our docs
+            Docs
           </a>
         </div>
+        <div className="flex items-center gap-4">
+          <button className="text-sm text-gray-700 dark:text-gray-300 hover:underline">
+            Gmail
+          </button>
+          <button className="text-sm text-gray-700 dark:text-gray-300 hover:underline">
+            Images
+          </button>
+          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium cursor-pointer hover:ring-2 hover:ring-blue-400">
+            N
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 -mt-16">
+        {/* Logo */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2">
+            <Image
+              src="/next.svg"
+              alt="Next.js"
+              width={200}
+              height={50}
+              priority
+              className="dark:invert"
+            />
+            <span className="text-2xl font-light text-gray-600 dark:text-gray-400">Search</span>
+          </div>
+        </div>
+
+        {/* Search Box */}
+        <form onSubmit={handleSearch} className="w-full max-w-2xl">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-4">
+              <svg 
+                className="w-5 h-5 text-gray-400" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-12 py-4 text-lg border border-gray-300 dark:border-gray-600 rounded-full 
+                       hover:shadow-lg focus:shadow-lg focus:outline-none 
+                       dark:bg-gray-800 dark:text-white transition-shadow duration-200"
+              placeholder="Search the web..."
+            />
+            <div className="absolute inset-y-0 right-0 flex items-center pr-4 gap-3">
+              <button type="button" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 14l-4-4h8l-4 4z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-4 justify-center mt-8">
+            <button
+              type="submit"
+              className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 
+                       rounded hover:ring-1 hover:ring-gray-300 dark:hover:ring-gray-600 
+                       font-medium text-sm transition-all"
+            >
+              Next.js Search
+            </button>
+            <button
+              type="button"
+              onClick={() => window.open('https://nextjs.org/docs', '_blank')}
+              className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 
+                       rounded hover:ring-1 hover:ring-gray-300 dark:hover:ring-gray-600 
+                       font-medium text-sm transition-all"
+            >
+              I&apos;m Feeling Lucky
+            </button>
+          </div>
+        </form>
+
+        {/* Language Options */}
+        <div className="mt-8 text-sm text-gray-600 dark:text-gray-400">
+          Search available in:{" "}
+          <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">日本語</a>
+          {" "}{" "}
+          <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">English</a>
+        </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-700">
+        <div className="px-8 py-3 border-b border-gray-300 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Powered by Next.js</p>
+        </div>
+        <div className="px-8 py-4 flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex gap-6 flex-wrap justify-center sm:justify-start">
+            <a
+              href="https://nextjs.org/learn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+            >
+              Learn
+            </a>
+            <a
+              href="https://vercel.com/templates?framework=next.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+            >
+              Examples
+            </a>
+            <a
+              href="https://nextjs.org/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+            >
+              Documentation
+            </a>
+          </div>
+          <div className="flex gap-6 flex-wrap justify-center sm:justify-end">
+            <a
+              href="https://nextjs.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+            >
+              Privacy
+            </a>
+            <a
+              href="https://vercel.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+            >
+              Terms
+            </a>
+            <a
+              href="https://github.com/vercel/next.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+            >
+              Settings
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );
