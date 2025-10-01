@@ -75,9 +75,9 @@ function parseSearchResults(html: string): SearchResult[] {
       const urlMatch = context.match(/<a[^>]*href="(\/url\?q=)?(https?:\/\/[^"&<>]+)/i);
       
       // スニペットを抽出 (h3の後から探す)
-      const snippetMatch = context.match(/<div[^>]*class="[^"]*VwiC3b[^"]*"[^>]*>(.*?)<\/div>/is) ||
-                          context.match(/<span[^>]*class="[^"]*aCOpRe[^"]*"[^>]*>(.*?)<\/span>/is) ||
-                          context.match(/<div[^>]*style="[^"]*"[^>]*><span>(.*?)<\/span>/is);
+      const snippetMatch = context.match(/<div[^>]*class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+                          context.match(/<span[^>]*class="[^"]*aCOpRe[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
+                          context.match(/<div[^>]*style="[^"]*"[^>]*><span>([\s\S]*?)<\/span>/i);
       
       if (title && urlMatch) {
         const link = urlMatch[2];
@@ -96,7 +96,7 @@ function parseSearchResults(html: string): SearchResult[] {
 
     // パターン2: より広範なパターン
     if (results.length < 5) {
-      const widePattern = /<a[^>]*href="\/url\?q=(https?:\/\/[^"&]+)[^>]*>.*?<br><div[^>]*><div[^>]*><div[^>]*><span[^>]*>(.*?)<\/span>/gis;
+      const widePattern = /<a[^>]*href="\/url\?q=(https?:\/\/[^"&]+)[^>]*>[\s\S]*?<br><div[^>]*><div[^>]*><div[^>]*><span[^>]*>([\s\S]*?)<\/span>/gi;
       let match;
       while ((match = widePattern.exec(html)) !== null && results.length < 10) {
         const link = match[1];
@@ -139,7 +139,7 @@ function parseSearchResults(html: string): SearchResult[] {
         const surroundingContext = html.substring(linkIndex, linkIndex + 800);
         
         const titleInContext = surroundingContext.match(/<h3[^>]*>(.*?)<\/h3>/i);
-        const snippetInContext = surroundingContext.match(/<div[^>]*class="[^"]*VwiC3b[^"]*"[^>]*>(.*?)<\/div>/is);
+        const snippetInContext = surroundingContext.match(/<div[^>]*class="[^"]*VwiC3b[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
         
         const title = titleInContext ? stripHtml(titleInContext[1]) : extractDomain(link);
         const snippet = snippetInContext ? stripHtml(snippetInContext[1]).substring(0, 300) : '';
