@@ -2,8 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface SearchResult {
   title: string;
@@ -12,21 +11,27 @@ interface SearchResult {
   displayLink?: string;
 }
 
-function SearchContent() {
-  const searchParams = useSearchParams();
-  const query = searchParams.get("q") || "";
-  const [searchQuery, setSearchQuery] = useState(query);
+export default function SearchPage() {
+  const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // クライアント側でURLパラメータを取得
   useEffect(() => {
-    if (query) {
-      fetchSearchResults(query);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("q") || "";
+      setQuery(q);
+      setSearchQuery(q);
+      if (q) {
+        fetchSearchResults(q);
+      }
     }
-  }, [query]);
+  }, []);
 
-  const fetchSearchResults = async (searchTerm: string) => {
+  const fetchSearchResults = useCallback(async (searchTerm: string) => {
     setLoading(true);
     setError(null);
     
@@ -58,7 +63,7 @@ function SearchContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const parseSearchResults = (html: string, searchTerm: string): SearchResult[] => {
     const results: SearchResult[] = [];
@@ -154,7 +159,9 @@ function SearchContent() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`;
+      setQuery(searchQuery);
+      fetchSearchResults(searchQuery);
+      window.history.pushState({}, '', `/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -369,17 +376,5 @@ function SearchContent() {
         </div>
       </footer>
     </div>
-  );
-}
-
-export default function SearchPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
-      </div>
-    }>
-      <SearchContent />
-    </Suspense>
   );
 }
